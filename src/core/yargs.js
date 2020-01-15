@@ -57,6 +57,11 @@ export function _baseOptions (yargs) {
       describe: 'When available show various debug information',
       default: false,
       type: 'boolean'
+    })
+    .option('use-transaction', {
+      describe: 'Wrap the migration in a transaction',
+      default: false,
+      type: 'boolean'
     });
 }
 
