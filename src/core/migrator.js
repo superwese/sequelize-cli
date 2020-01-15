@@ -1,3 +1,4 @@
+import TransactionalUmzug from './TransactionalUmzug';
 import Umzug from 'umzug';
 import Bluebird from 'bluebird';
 import _ from 'lodash';
@@ -30,7 +31,41 @@ function getSequelizeInstance () {
   }
 }
 
+function getUmzug(type, sequelize) {
+  return new Umzug({
+    storage: helpers.umzug.getStorage(type),
+    storageOptions: helpers.umzug.getStorageOptions(type, { sequelize }),
+    logging: helpers.view.log,
+    migrations: {
+      params: [sequelize.getQueryInterface(), Sequelize],
+      path: helpers.path.getPath(type),
+      pattern: /\.js$/,
+      wrap: fun => {
+        if (fun.length === 3) {
+          return Bluebird.promisify(fun);
+        } else {
+          return fun;
+        }
+      }
+    }
+  })
+}
+
+function getTransactionalUmzug(type, sequelize) {
+  return new TransactionalUmzug({
+    storage: helpers.umzug.getStorage(type),
+    storageOptions: helpers.umzug.getStorageOptions(type, { sequelize }),
+    logging: helpers.view.log,
+    migrations: {
+      params: [sequelize.getQueryInterface(), Sequelize],
+      path: helpers.path.getPath(type),
+      pattern: /\.js$/,
+    }
+  });
+}
+
 export function getMigrator (type, args) {
+
   return Bluebird.try(() => {
     if (!(helpers.config.configFileExists() || args.url)) {
       helpers.view.error(
@@ -41,23 +76,7 @@ export function getMigrator (type, args) {
     }
 
     const sequelize = getSequelizeInstance();
-    const migrator = new Umzug({
-      storage: helpers.umzug.getStorage(type),
-      storageOptions: helpers.umzug.getStorageOptions(type, { sequelize }),
-      logging: helpers.view.log,
-      migrations: {
-        params: [sequelize.getQueryInterface(), Sequelize],
-        path: helpers.path.getPath(type),
-        pattern: /\.js$/,
-        wrap: fun => {
-          if (fun.length === 3) {
-            return Bluebird.promisify(fun);
-          } else {
-            return fun;
-          }
-        }
-      }
-    });
+    const migrator = args.useTransaction ? getTransactionalUmzug(type, sequelize) : getUmzug(type, sequelize);
 
     return sequelize
       .authenticate()
